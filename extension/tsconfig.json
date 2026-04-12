@@ -4,7 +4,9 @@
     "module": "ESNext",
     "rootDir": "./src",
     "outDir": "./dist",
-    "strict": true
+    "strict": true,
+    "types": ["chrome"],
+    "lib": ["ES6", "DOM"]
   },
   "include": ["src/**/*.ts"]
 }

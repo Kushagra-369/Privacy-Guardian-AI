@@ -8,6 +8,77 @@ const blacklist = [
     "fakebank.xyz",
     "malicious-site.net"
 ];
+// ===== URL PHISHING DETECTION 🔥 =====
+const url = window.location.hostname.toLowerCase();
+const suspiciousPatterns = [
+    "login",
+    "secure",
+    "verify",
+    "account",
+    "update",
+    "bank"
+];
+const fakeBrands = [
+    "g00gle",
+    "amaz0n",
+    "paytm-secure",
+    "faceboook",
+    "instagrarn"
+];
+// IP URL check
+const isIP = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/.test(url);
+// suspicious words
+const hasSuspiciousWord = suspiciousPatterns.some(word => url.includes(word));
+// fake brand detection
+const isFakeBrand = fakeBrands.some(brand => url.includes(brand));
+// FINAL FLAG
+const urlPhishing = isIP || hasSuspiciousWord || isFakeBrand;
+// ===== BRAND SIMILARITY 🔥 =====
+const realBrands = [
+    "google", "amazon", "facebook", "instagram", "paytm",
+    "twitter", "linkedin", "netflix", "spotify", "microsoft",
+    "apple", "paypal", "stripe", "visa", "mastercard",
+    "flipkart", "ebay", "alibaba", "whatsapp", "telegram",
+    "snapchat", "hdfc", "icici", "sbi", "yahoo",
+    "bing", "reddit", "twitch", "discord", "tiktok",
+    "uber", "ola", "zomato", "swiggy", "amazonpay",
+    "googlepay", "phonepe", "freecharge", "mobikwik"
+];
+function similarity(a, b) {
+    let longer = a.length > b.length ? a : b;
+    let shorter = a.length > b.length ? b : a;
+    let longerLength = longer.length;
+    if (longerLength === 0)
+        return 1.0;
+    function editDistance(s1, s2) {
+        let costs = [];
+        for (let i = 0; i <= s1.length; i++) {
+            let lastValue = i;
+            for (let j = 0; j <= s2.length; j++) {
+                if (i === 0)
+                    costs[j] = j;
+                else if (j > 0) {
+                    let newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) !== s2.charAt(j - 1))
+                        newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+            if (i > 0)
+                costs[s2.length] = lastValue;
+        }
+        return costs[s2.length];
+    }
+    return (longerLength - editDistance(longer, shorter)) / longerLength;
+}
+let brandSpoof = false;
+realBrands.forEach(brand => {
+    const score = similarity(url, brand);
+    if (score > 0.6 && url !== brand) {
+        brandSpoof = true;
+    }
+});
 const currentDomain = window.location.hostname;
 const isBlacklisted = blacklist.some(domain => currentDomain.includes(domain));
 // ===== TRACKERS =====
@@ -119,10 +190,13 @@ function calculateRisk() {
         risk += 25;
     if (isBlacklisted)
         risk += 50;
+    if (urlPhishing)
+        risk += 30;
+    if (brandSpoof)
+        risk += 40;
     if (risk > 100)
         risk = 100;
 }
-// ===== BACKEND CALL =====
 setTimeout(() => {
     fetch("http://127.0.0.1:8000/analyze", {
         method: "POST",
@@ -136,21 +210,38 @@ setTimeout(() => {
             microphone: microphoneStatus,
             sensitive: hasSensitiveForm,
             phishing: foundSuspicious,
-            blacklisted: isBlacklisted
+            blacklisted: isBlacklisted,
+            url_phishing: urlPhishing,
+            url_length: window.location.href.length,
+            has_https: window.location.protocol === "https:",
+            dots: (window.location.hostname.match(/\./g) || []).length,
+            url: window.location.href
         }),
     })
         .then(res => res.json())
         .then(result => {
         aiRisk = result.risk;
-        aiMessage = result.message;
-        const aiText = document.getElementById("ai-text");
-        if (aiText)
-            aiText.innerText = aiMessage;
+        aiMessage = result.message || "No AI analysis available";
+        showPopup(); // 🔥 correct place
     })
         .catch(() => { });
 }, 2200);
-// ===== POPUP =====
-setTimeout(showPopup, 2500);
+// ===== AUTO FORM WARNING 🔥 =====
+document.addEventListener("submit", function (e) {
+    if (risk > 60) {
+        e.preventDefault();
+        alert("⚠️ Risky site! Do not enter sensitive data.");
+    }
+});
+chrome.storage.local.get(["history"], (res) => {
+    let history = res.history || [];
+    history.push({
+        url: window.location.hostname,
+        risk: risk,
+        time: new Date().toLocaleString()
+    });
+    chrome.storage.local.set({ history });
+});
 function showPopup() {
     var _a;
     if (document.getElementById("pgai-overlay"))
@@ -218,7 +309,7 @@ function showPopup() {
 
         <div style="padding:10px;background:#1e293b;border-radius:10px;">
             <b>🤖 AI Analysis:</b><br/>
-            <span id="ai-text">${aiMessage || "Analyzing..."}</span>
+            <span id="ai-text">${aiMessage ? aiMessage : "Analyzing..."}</span>
         </div>
 
         <button id="closeBtn" style="margin-top:10px;">Close</button>
