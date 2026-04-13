@@ -186,10 +186,13 @@ def analyze(data: Data):
         extra_risk = 0
 
         unsafe = check_google_safe(data.url)  # better: pass actual URL later
+        if "malware" in data.url or "billing" in data.url:
+            extra_risk += 25
 
         if unsafe:
             print("🚨 GOOGLE SAFE BROWSING DETECTED THREAT")
-            extra_risk = 100   # 🔥 strong boost
+            extra_risk += 70   # 🔥 strong boost
+
  
         if data.blacklisted:
             extra_risk += 50

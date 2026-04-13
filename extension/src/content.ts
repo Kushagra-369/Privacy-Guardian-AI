@@ -3,16 +3,16 @@ let aiRisk: number | null = null;
 let aiMessage: string = "";
 
 // ===== BLACKLIST =====
-const blacklist = [
+const blacklist: string[] = [
     "phishing.com",
     "fakebank.xyz",
     "malicious-site.net"
 ];
 
 // ===== URL PHISHING DETECTION 🔥 =====
-const url = window.location.hostname.toLowerCase();
+const url: string = window.location.hostname.toLowerCase();
 
-const suspiciousPatterns = [
+const suspiciousPatterns: string[] = [
     "login",
     "secure",
     "verify",
@@ -21,7 +21,7 @@ const suspiciousPatterns = [
     "bank"
 ];
 
-const fakeBrands = [
+const fakeBrands: string[] = [
     "g00gle",
     "amaz0n",
     "paytm-secure",
@@ -30,23 +30,23 @@ const fakeBrands = [
 ];
 
 // IP URL check
-const isIP = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/.test(url);
+const isIP: boolean = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/.test(url);
 
 // suspicious words
-const hasSuspiciousWord = suspiciousPatterns.some(word =>
+const hasSuspiciousWord: boolean = suspiciousPatterns.some(word =>
     url.includes(word)
 );
 
 // fake brand detection
-const isFakeBrand = fakeBrands.some(brand =>
+const isFakeBrand: boolean = fakeBrands.some(brand =>
     url.includes(brand)
 );
 
 // FINAL FLAG
-const urlPhishing = isIP || hasSuspiciousWord || isFakeBrand;
+const urlPhishing: boolean = isIP || hasSuspiciousWord || isFakeBrand;
 
 // ===== BRAND SIMILARITY 🔥 =====
-const realBrands = [
+const realBrands: string[] = [
     "google", "amazon", "facebook", "instagram", "paytm",
     "twitter", "linkedin", "netflix", "spotify", "microsoft",
     "apple", "paypal", "stripe", "visa", "mastercard",
@@ -57,21 +57,21 @@ const realBrands = [
     "googlepay", "phonepe", "freecharge", "mobikwik"
 ];
 
-function similarity(a: string, b: string) {
-    let longer = a.length > b.length ? a : b;
-    let shorter = a.length > b.length ? b : a;
+function similarity(a: string, b: string): number {
+    let longer: string = a.length > b.length ? a : b;
+    let shorter: string = a.length > b.length ? b : a;
 
-    let longerLength = longer.length;
+    let longerLength: number = longer.length;
     if (longerLength === 0) return 1.0;
 
-    function editDistance(s1: string, s2: string) {
-        let costs = [];
+    function editDistance(s1: string, s2: string): number {
+        let costs: number[] = [];
         for (let i = 0; i <= s1.length; i++) {
-            let lastValue = i;
+            let lastValue: number = i;
             for (let j = 0; j <= s2.length; j++) {
                 if (i === 0) costs[j] = j;
                 else if (j > 0) {
-                    let newValue = costs[j - 1];
+                    let newValue: number = costs[j - 1];
                     if (s1.charAt(i - 1) !== s2.charAt(j - 1))
                         newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
                     costs[j - 1] = lastValue;
@@ -86,22 +86,22 @@ function similarity(a: string, b: string) {
     return (longerLength - editDistance(longer, shorter)) / longerLength;
 }
 
-let brandSpoof = false;
+let brandSpoof: boolean = false;
 
 realBrands.forEach(brand => {
-    const score = similarity(url, brand);
+    const score: number = similarity(url, brand);
     if (score > 0.6 && url !== brand) {
         brandSpoof = true;
     }
 });
 
-const currentDomain = window.location.hostname;
-const isBlacklisted = blacklist.some(domain =>
+const currentDomain: string = window.location.hostname;
+const isBlacklisted: boolean = blacklist.some(domain =>
     currentDomain.includes(domain)
 );
 
 // ===== TRACKERS =====
-const trackerDomains = [
+const trackerDomains: string[] = [
     "google-analytics.com",
     "googletagmanager.com",
     "doubleclick.net",
@@ -110,7 +110,7 @@ const trackerDomains = [
     "ads.",
 ];
 
-const elements = [
+const elements: Element[] = [
     ...Array.from(document.querySelectorAll("script")),
     ...Array.from(document.querySelectorAll("img")),
     ...Array.from(document.querySelectorAll("iframe")),
@@ -120,8 +120,8 @@ const elements = [
 const detectedTrackers: string[] = [];
 
 elements.forEach((el: any) => {
-    const src = el.src || el.href || "";
-    trackerDomains.forEach((domain) => {
+    const src: string = el.src || el.href || "";
+    trackerDomains.forEach((domain: string) => {
         if (src.includes(domain)) {
             detectedTrackers.push(domain);
         }
@@ -133,42 +133,43 @@ let heuristicTrackers: string[] = [];
 
 if (navigator.cookieEnabled) heuristicTrackers.push("cookies-enabled");
 
-const finalTrackers = [
+const finalTrackers: string[] = [
     ...new Set([...detectedTrackers, ...heuristicTrackers]),
 ];
 
 // ===== PERMISSIONS =====
-let locationStatus = "Checking...";
-let cameraStatus = "Checking...";
-let microphoneStatus = "Checking...";
+let locationStatus: string = "Checking...";
+let cameraStatus: string = "Checking...";
+let microphoneStatus: string = "Checking...";
 
+// Use 'any' to avoid conflict with lib.dom.d.ts PermissionName
 if (navigator.permissions) {
-    navigator.permissions.query({ name: "geolocation" as PermissionName }).then(res => {
+    navigator.permissions.query({ name: "geolocation" as any }).then((res: PermissionStatus) => {
         locationStatus = res.state === "granted" ? "Allowed ✅" :
             res.state === "denied" ? "Blocked ❌" : "Requested ⚠️";
-    });
+    }).catch(() => {});
 
-    navigator.permissions.query({ name: "camera" as PermissionName }).then(res => {
+    navigator.permissions.query({ name: "camera" as any }).then((res: PermissionStatus) => {
         cameraStatus = res.state === "granted" ? "Allowed ✅" :
             res.state === "denied" ? "Blocked ❌" : "Requested ⚠️";
-    });
+    }).catch(() => {});
 
-    navigator.permissions.query({ name: "microphone" as PermissionName }).then(res => {
+    navigator.permissions.query({ name: "microphone" as any }).then((res: PermissionStatus) => {
         microphoneStatus = res.state === "granted" ? "Allowed ✅" :
             res.state === "denied" ? "Blocked ❌" : "Requested ⚠️";
-    });
+    }).catch(() => {});
 }
 
 // ===== SENSITIVE INPUT =====
-let hasSensitiveForm = false;
+let hasSensitiveForm: boolean = false;
 
-function detectSensitiveForm() {
-    const inputs = Array.from(document.querySelectorAll("input"));
+function detectSensitiveForm(): void {
+    const inputs: Element[] = Array.from(document.querySelectorAll("input"));
 
     inputs.forEach((input: any) => {
-        const type = (input.type || "").toLowerCase();
-        const name = (input.name || "").toLowerCase();
-        const placeholder = (input.placeholder || "").toLowerCase();
+        const type: string = (input.type || "").toLowerCase();
+        const name: string = (input.name || "").toLowerCase();
+        const placeholder: string = (input.placeholder || "").toLowerCase();
 
         if (
             type === "password" ||
@@ -184,7 +185,7 @@ function detectSensitiveForm() {
         }
     });
 
-    const formText = document.body.innerText.toLowerCase();
+    const formText: string = document.body.innerText.toLowerCase();
 
     if (
         formText.includes("sign up") ||
@@ -195,19 +196,10 @@ function detectSensitiveForm() {
     }
 }
 
-setTimeout(() => {
-    detectSensitiveForm();
-
-    // 🔥 RECALCULATE RISK AFTER DETECTION
-    calculateRisk();
-
-}, 2000);
-// 🔥 RUN AFTER DELAY (IMPORTANT)
-
 // ===== PHISHING TEXT =====
-const pageText = document.body.innerText.toLowerCase();
+const pageText: string = document.body.innerText.toLowerCase();
 
-const suspiciousWords = [
+const suspiciousWords: string[] = [
     "enter otp",
     "bank login",
     "verify account",
@@ -215,18 +207,22 @@ const suspiciousWords = [
     "urgent action",
 ];
 
-const foundSuspicious = suspiciousWords.some(word => pageText.includes(word));
+const foundSuspicious: boolean = suspiciousWords.some(word => pageText.includes(word));
 
 // ===== RISK =====
-let risk = 0;
+let risk: number = 0;
 
-function calculateRisk() {
-    risk = finalTrackers.length * 20;
+function calculateRisk(): void {
+    risk = finalTrackers.length * 25;
 
     if (navigator.cookieEnabled) risk += 10;
     if (locationStatus.includes("Allowed")) risk += 25;
     if (cameraStatus.includes("Allowed")) risk += 25;
     if (microphoneStatus.includes("Allowed")) risk += 20;
+    // 🔥 NEW — permission requested bhi risky hai
+    if (locationStatus.includes("Requested")) risk += 10;
+    if (cameraStatus.includes("Requested")) risk += 10;
+    if (microphoneStatus.includes("Requested")) risk += 10;
 
     if (hasSensitiveForm) risk += 20;
     if (foundSuspicious) risk += 25;
@@ -234,116 +230,229 @@ function calculateRisk() {
     if (urlPhishing) risk += 30;
     if (brandSpoof) risk += 40;
 
+    if (pageText.includes("malware") || pageText.includes("virus")) {
+        risk += 25;
+    }
+    if (pageText.includes("download") && pageText.includes("malware")) {
+        risk += 20;
+    }
     if (risk > 100) risk = 100;
 }
 
-setTimeout(() => {
+// ===== STORAGE KEYS =====
+const STORAGE_KEY_CONTINUE: string = "pgai_continue_permission";
+const STORAGE_KEY_HISTORY: string = "history";
 
-    fetch("http://127.0.0.1:8000/analyze", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            trackers: finalTrackers,
-            location: locationStatus,
-            camera: cameraStatus,
-            microphone: microphoneStatus,
-            sensitive: hasSensitiveForm,
-            phishing: foundSuspicious,
-            blacklisted: isBlacklisted,
-            url_phishing: urlPhishing,
-            url_length: window.location.href.length,
-            has_https: window.location.protocol === "https:",
-            dots: (window.location.hostname.match(/\./g) || []).length,
-            url: window.location.href
-        }),
-    })
-        .then(res => res.json())
-        .then(result => {
-            aiRisk = result.risk;
-            aiMessage = result.message || "No AI analysis available";
+// Type definition for storage data
+interface ContinueData {
+    [key: string]: boolean;
+}
 
-            showPopup(); // 🔥 correct place
-        })
-        .catch(() => { });
+// Check if user has already chosen "Continue" for this domain
+async function hasUserContinued(): Promise<boolean> {
+    return new Promise((resolve) => {
+        chrome.storage.local.get([STORAGE_KEY_CONTINUE], (res) => {
+            const continueData: ContinueData = res[STORAGE_KEY_CONTINUE] as ContinueData || {};
+            resolve(!!continueData[currentDomain]);
+        });
+    });
+}
 
-}, 2200);
-
-
-// ===== AUTO FORM WARNING 🔥 =====
-document.addEventListener("submit", function (e) {
-    if (risk > 60) {
-        e.preventDefault();
-        alert("⚠️ Risky site! Do not enter sensitive data.");
-    }
-});
+async function setUserContinued(domain: string): Promise<void> {
+    return new Promise((resolve) => {
+        chrome.storage.local.get([STORAGE_KEY_CONTINUE], (res) => {
+            const continueData: ContinueData = res[STORAGE_KEY_CONTINUE] as ContinueData || {};
+            continueData[domain] = true;
+            chrome.storage.local.set({ [STORAGE_KEY_CONTINUE]: continueData }, () => {
+                resolve();
+            });
+        });
+    });
+}
 
 // ===== HISTORY TRACKING 🔥 =====
-type HistoryItem = {
+interface HistoryItem {
     url: string;
     risk: number;
     time: string;
-};
+}
 
-chrome.storage.local.get(["history"], (res: { history?: HistoryItem[] }) => {
-    let history: HistoryItem[] = res.history || [];
+function addToHistory(): void {
+    chrome.storage.local.get([STORAGE_KEY_HISTORY], (res) => {
+        let history: HistoryItem[] = (res.history as HistoryItem[]) || [];
 
-    history.push({
-        url: window.location.hostname,
-        risk: risk,
-        time: new Date().toLocaleString()
+        history.push({
+            url: window.location.hostname,
+            risk: risk,
+            time: new Date().toLocaleString()
+        });
+
+        chrome.storage.local.set({ [STORAGE_KEY_HISTORY]: history });
     });
+}
 
-    chrome.storage.local.set({ history });
-});
+// ===== POPUP FUNCTIONS =====
 
+function showSmallNotification(): void {
+    if (document.getElementById("pgai-notification")) return;
 
-function showPopup() {
-    if (document.getElementById("pgai-overlay")) return;
+    const notification: HTMLDivElement = document.createElement("div");
+    notification.id = "pgai-notification";
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #1e293b;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        z-index: 999998;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: opacity 0.3s;
+    `;
 
-    if (aiRisk !== null) risk = aiRisk;
-    else calculateRisk();
+    notification.innerHTML = `
+        <span>🛡️ Risk: <strong style="color: #facc15;">${risk}%</strong></span>
+        <button id="pgai-view-more" style="
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        ">View More</button>
+        <button id="pgai-notification-close" style="
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+            margin-left: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">✕</button>
+    `;
 
-    // ===== AUTO BLOCK =====
-    if (isBlacklisted || risk > 85) {
-        document.body.innerHTML = `
-            <div style="
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                height:100vh;
-                background:black;
-                color:white;
-                font-family:Arial;
-                text-align:center;
-            ">
-                <div>
-                    <h1>🚨 BLOCKED: Unsafe Website</h1>
-                    <p>This site is flagged as dangerous.</p>
-                </div>
-            </div>
-        `;
-        return;
+    document.body.appendChild(notification);
+
+    const viewMoreBtn = document.getElementById("pgai-view-more");
+    if (viewMoreBtn) {
+        viewMoreBtn.addEventListener("click", () => {
+            notification.remove();
+            showBigPopup(false, false);
+        });
     }
 
-    const overlay = document.createElement("div");
+    const closeBtn = document.getElementById("pgai-notification-close");
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            notification.remove();
+        });
+    }
+
+    // Auto hide after 8 seconds
+    setTimeout(() => {
+        const notif = document.getElementById("pgai-notification");
+        if (notif) {
+            notif.style.opacity = "0";
+            setTimeout(() => notif.remove(), 300);
+        }
+    }, 8000);
+}
+
+function showBigPopup(showCancelContinue: boolean, isBlockedFlow: boolean = false): void {
+    if (document.getElementById("pgai-overlay")) return;
+
+    const overlay: HTMLDivElement = document.createElement("div");
     overlay.id = "pgai-overlay";
     overlay.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.85);
-        display:flex;justify-content:center;align-items:center;
-        z-index:999999;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 999999;
     `;
 
-    const popup = document.createElement("div");
+    const popup: HTMLDivElement = document.createElement("div");
     popup.style.cssText = `
-        background:#0f172a;color:white;padding:25px;
-        border-radius:16px;width:420px;font-family:Arial;
+        background: #0f172a;
+        color: white;
+        padding: 25px;
+        border-radius: 16px;
+        width: 420px;
+        font-family: Arial, sans-serif;
+        position: relative;
     `;
+
+    // Add close button (X) at top right
+    const closeBtn: HTMLSpanElement = document.createElement("span");
+    closeBtn.innerHTML = "✕";
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 20px;
+        cursor: pointer;
+        color: #94a3b8;
+    `;
+    popup.appendChild(closeBtn);
+
+    let buttonsHtml: string = "";
+    if (showCancelContinue && !isBlockedFlow) {
+        buttonsHtml = `
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button id="pgai-cancel" style="
+                    background: #ef4444;
+                    border: none;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    flex: 1;
+                ">Cancel & Go Back</button>
+                <button id="pgai-continue" style="
+                    background: #22c55e;
+                    border: none;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    flex: 1;
+                ">Continue Anyway</button>
+            </div>
+        `;
+    } else if (isBlockedFlow) {
+        buttonsHtml = `
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button id="pgai-go-back" style="
+                    background: #ef4444;
+                    border: none;
+                    color: white;
+                    padding: 12px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    width: 100%;
+                    font-size: 16px;
+                ">← Go Back to Safety</button>
+            </div>
+        `;
+    }
 
     popup.innerHTML = `
-        <h2>🛡️ Privacy Guardian AI</h2>
+        <h2 style="margin-top: 0;">🛡️ Privacy Guardian AI</h2>
 
         <p><b>Site:</b> ${window.location.hostname}</p>
         <p><b>Risk:</b> ${risk}%</p>
@@ -369,19 +478,172 @@ function showPopup() {
             <b>🤖 AI Analysis:</b><br/>
             <span id="ai-text">${aiMessage ? aiMessage : "Analyzing..."}</span>
         </div>
-
-        <button id="closeBtn" style="margin-top:10px;">Close</button>
+        ${buttonsHtml}
     `;
 
     overlay.appendChild(popup);
     document.body.appendChild(overlay);
 
+    // Update AI text later if needed
     setTimeout(() => {
         const aiText = document.getElementById("ai-text");
         if (aiText && aiMessage) aiText.innerText = aiMessage;
     }, 300);
 
-    document.getElementById("closeBtn")?.addEventListener("click", () => {
+    // Close button (X) behavior
+    closeBtn.onclick = () => {
         overlay.remove();
-    });
+    };
+
+    if (showCancelContinue && !isBlockedFlow) {
+        const cancelBtn = document.getElementById("pgai-cancel");
+        const continueBtn = document.getElementById("pgai-continue");
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener("click", () => {
+                window.history.back();
+            });
+        }
+
+        if (continueBtn) {
+            continueBtn.addEventListener("click", async () => {
+                overlay.remove();
+                await setUserContinued(currentDomain);
+            });
+        }
+    }
+
+    if (isBlockedFlow) {
+        const goBackBtn = document.getElementById("pgai-go-back");
+        if (goBackBtn) {
+            goBackBtn.addEventListener("click", () => {
+                window.history.back();
+            });
+        }
+    }
 }
+
+function showBlockedScreen(): void {
+    document.body.innerHTML = `
+        <div style="
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+            background:#2d0000;
+            color:#ffcccc;
+            font-family:Arial, sans-serif;
+            text-align:center;
+        ">
+            <div style="background:#4a0000; padding:40px; border-radius:20px; border: 2px solid #ff4444;">
+                <h1>🚨 ACCESS BLOCKED</h1>
+                <p style="font-size:18px;">This website is highly dangerous (Risk > 75%)</p>
+                <p style="font-size:14px; margin-top:20px;">To protect your privacy and security, access has been automatically blocked.</p>
+                <button id="pgai-blocked-back" style="
+                    margin-top:30px;
+                    background:#ff4444;
+                    border:none;
+                    color:white;
+                    padding:12px 24px;
+                    border-radius:8px;
+                    cursor:pointer;
+                    font-size:16px;
+                ">← Go Back to Safety</button>
+            </div>
+        </div>
+    `;
+
+    const backBtn = document.getElementById("pgai-blocked-back");
+    if (backBtn) {
+        backBtn.addEventListener("click", () => {
+            window.history.back();
+        });
+    }
+}
+
+// ===== AUTO FORM WARNING 🔥 =====
+document.addEventListener("submit", function (e: Event) {
+    if (risk > 60) {
+        e.preventDefault();
+        alert("⚠️ Risky site! Do not enter sensitive data.");
+    }
+});
+
+// ===== MAIN EXECUTION =====
+setTimeout(async () => {
+    detectSensitiveForm();
+    calculateRisk();
+
+    // Send data to AI
+    try {
+        const response = await fetch("http://127.0.0.1:8000/analyze", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                trackers: finalTrackers,
+                location: locationStatus,
+                camera: cameraStatus,
+                microphone: microphoneStatus,
+                sensitive: hasSensitiveForm,
+                phishing: foundSuspicious,
+                blacklisted: isBlacklisted,
+                url_phishing: urlPhishing,
+                url_length: window.location.href.length,
+                has_https: window.location.protocol === "https:",
+                dots: (window.location.hostname.match(/\./g) || []).length,
+                url: window.location.href
+            }),
+        });
+
+        const result = await response.json();
+        aiRisk = result.risk;
+        aiMessage = result.message || "No AI analysis available";
+
+        // Recalculate risk with AI data if needed
+        if (aiRisk !== null) risk = aiRisk;
+        else calculateRisk();
+
+        addToHistory();
+
+        // ===== DECISION TREE =====
+        if (isBlacklisted || risk > 75) {
+            showBlockedScreen();
+            return;
+        }
+
+        // Check if user already clicked "Continue" for this domain
+        const userContinued = await hasUserContinued();
+
+        if (userContinued) {
+            // User chose to continue previously, no popup
+            return;
+        }
+
+        if (risk >= 40 && risk <= 75) {
+            // Show big popup with Cancel/Continue buttons
+            showBigPopup(true, false);
+        } else if (risk < 40) {
+            // Show small notification at bottom right
+            showSmallNotification();
+        }
+    } catch (error) {
+        // If AI fails, still show based on local risk
+        addToHistory();
+        if (isBlacklisted || risk > 75) {
+            showBlockedScreen();
+            return;
+        }
+
+        const userContinued = await hasUserContinued();
+        if (userContinued) return;
+
+        if (risk >= 40 && risk <= 75) {
+            showBigPopup(true, false);
+        } else if (risk < 40) {
+            showSmallNotification();
+        }
+    }
+
+}, 2200);
