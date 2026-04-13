@@ -3,6 +3,33 @@
 let aiRisk = null;
 let aiMessage = "";
 let popupShownForSession = false;
+// ===== EXTRA PAGE ANALYSIS (NEW 🔥)
+// Get full page text (limited for performance)
+function getPageText() {
+    const text = document.body.innerText || "";
+    return text.substring(0, 5000); // limit to avoid heavy load
+}
+// Count iframes (suspicious)
+function getIframeCount() {
+    return document.querySelectorAll("iframe").length;
+}
+// Count external scripts
+function getExternalScripts() {
+    const scripts = Array.from(document.querySelectorAll("script"));
+    return scripts.filter((s) => s.src && !s.src.includes(location.hostname)).length;
+}
+// Detect hidden elements (phishing trick)
+function getHiddenElements() {
+    const elements = Array.from(document.querySelectorAll("*"));
+    return elements.filter((el) => {
+        const style = window.getComputedStyle(el);
+        return style.display === "none" || style.visibility === "hidden";
+    }).length;
+}
+const extraPageText = getPageText();
+const iframeCount = getIframeCount();
+const externalScripts = getExternalScripts();
+const hiddenElements = getHiddenElements();
 // ===== AGGRESSIVE BLACKLIST =====
 const blacklist = [
     "phishing.com",
@@ -608,7 +635,11 @@ window.addEventListener("load", async () => {
                 url_length: window.location.href.length,
                 has_https: window.location.protocol === "https:",
                 dots: subdomainCount,
-                url: window.location.href
+                url: window.location.href,
+                page_text: extraPageText,
+                iframe_count: iframeCount,
+                external_scripts: externalScripts,
+                hidden_elements: hiddenElements,
             }),
         });
         const result = await response.json();
@@ -622,14 +653,15 @@ window.addEventListener("load", async () => {
         if (isBlacklisted || (risk >= 85 && urlPhishing)) {
             showBlockedScreen();
         }
-        const userContinued = await hasUserContinued();
-        if (userContinued)
-            return;
         if (risk >= 50) {
             showBigPopup(true, false);
         }
         else if (risk >= 20) {
             showSmallNotification();
+        }
+        console.log("👉 Risk value:", risk);
+        if (risk >= 50) {
+            console.log("🔥 SHOULD SHOW POPUP");
         }
     }
     catch (error) {

@@ -3,6 +3,37 @@ let aiRisk: number | null = null;
 let aiMessage: string = "";
 let popupShownForSession: boolean = false;
 
+// ===== EXTRA PAGE ANALYSIS (NEW 🔥)
+
+// Get full page text (limited for performance)
+function getPageText(): string {
+    const text = document.body.innerText || "";
+    return text.substring(0, 5000); // limit to avoid heavy load
+}
+
+// Count iframes (suspicious)
+function getIframeCount(): number {
+    return document.querySelectorAll("iframe").length;
+}
+
+// Count external scripts
+function getExternalScripts(): number {
+    const scripts = Array.from(document.querySelectorAll("script"));
+    return scripts.filter((s: any) => s.src && !s.src.includes(location.hostname)).length;
+}
+
+// Detect hidden elements (phishing trick)
+function getHiddenElements(): number {
+    const elements = Array.from(document.querySelectorAll("*"));
+    return elements.filter((el: any) => {
+        const style = window.getComputedStyle(el);
+        return style.display === "none" || style.visibility === "hidden";
+    }).length;
+}
+const extraPageText = getPageText();
+const iframeCount = getIframeCount();
+const externalScripts = getExternalScripts();
+const hiddenElements = getHiddenElements();
 // ===== AGGRESSIVE BLACKLIST =====
 const blacklist: string[] = [
     "phishing.com",
@@ -20,6 +51,7 @@ const blacklist: string[] = [
 // ===== COMPREHENSIVE SUSPICIOUS PATTERNS =====
 const url = window.location.hostname.toLowerCase();
 const fullUrl = window.location.href.toLowerCase();
+
 
 const suspiciousPatterns: string[] = [
     "login", "secure", "verify", "account", "update", "bank",
@@ -684,7 +716,11 @@ window.addEventListener("load", async () => {
                 url_length: window.location.href.length,
                 has_https: window.location.protocol === "https:",
                 dots: subdomainCount,
-                url: window.location.href
+                url: window.location.href,
+                page_text: extraPageText,
+                iframe_count: iframeCount,
+                external_scripts: externalScripts,
+                hidden_elements: hiddenElements,
             }),
         });
 
@@ -704,8 +740,7 @@ window.addEventListener("load", async () => {
             showBlockedScreen();
         }
 
-        const userContinued = await hasUserContinued();
-        if (userContinued) return;
+     
 
         if (risk >= 50) {
             showBigPopup(true, false);
@@ -714,6 +749,11 @@ window.addEventListener("load", async () => {
             showSmallNotification();
         }
 
+        console.log("👉 Risk value:", risk);
+
+        if (risk >= 50) {
+            console.log("🔥 SHOULD SHOW POPUP");
+        }
     } catch (error) {
         console.error("AI Analysis failed:", error);
     }

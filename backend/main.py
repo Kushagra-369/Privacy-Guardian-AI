@@ -7,7 +7,8 @@ import requests
 import os
 import re
 from dotenv import load_dotenv
-
+from ai.feature_extractor import extract_advanced_features
+from ai.nlp_detector import detect_phishing_text
 load_dotenv()
 app = FastAPI()
 
@@ -56,6 +57,10 @@ class Data(BaseModel):
     has_https: bool = False
     dots: int = 0
     url: str = ""
+    page_text: str = ""
+    iframe_count: int = 0
+    external_scripts: int = 0
+    hidden_elements: int = 0
 
 @app.get("/")
 def home():
@@ -266,10 +271,18 @@ def generate_ai_message(risk: int, data: Data, phishing_detected: bool, url_phis
 @app.post("/analyze")
 def analyze(data: Data):
     print("📥 Analyzing:", data.url)
-    
+    # ===== ADVANCED FEATURES (NEW 🔥) =====
     try:
-        # ===== ADVANCED URL ANALYSIS =====
-     
+        page_text = data.page_text.lower()
+        iframe_count = data.iframe_count
+        external_scripts = data.external_scripts
+        hidden_elements = data.hidden_elements
+        nlp_score, nlp_reasons = detect_phishing_text(data.url)
+        advanced_features = extract_advanced_features(data.url)
+
+        domain_age = advanced_features.get("domain_age", -1)
+        dns_valid = advanced_features.get("dns_valid", 0)
+        ssl_valid = advanced_features.get("ssl_valid", 0)     
         
         # ===== CALCULATE BASE RISK =====
         num_trackers = len(data.trackers)
@@ -307,6 +320,8 @@ def analyze(data: Data):
             extra_risk += 40   # reduced from 60
         if data.url_phishing:
             extra_risk += 20
+            
+
         
           # ===== SAFE DOMAIN CHECK (FIXED 🔥) =====
         url_phishing_advanced, url_risk_score = detect_url_phishing_advanced(data.url)
@@ -314,6 +329,32 @@ def analyze(data: Data):
         
         domain_only = data.url.split("/")[2] if "://" in data.url else data.url
         is_safe_domain = any(domain_only.endswith(d) for d in SAFE_DOMAINS)
+        # ===== ADVANCED FEATURE RISK (NEW 🔥) =====
+        if domain_age != -1 and domain_age < 30:
+            extra_risk += 15   # new domain = risky
+
+        if dns_valid == 0:
+            extra_risk += 10   # invalid DNS
+
+        if ssl_valid == 0 and not is_safe_domain:
+            extra_risk += 15   # SSL issue
+        
+        if nlp_score > 0:
+            extra_risk += min(20, nlp_score)
+        # ===== PAGE BEHAVIOR ANALYSIS (NEW 🔥) =====
+
+        if iframe_count > 3:
+            extra_risk += 15
+
+        if external_scripts > 5:
+            extra_risk += 15
+
+        if hidden_elements > 20:
+            extra_risk += 10
+
+        if any(word in page_text for word in ["verify account", "enter otp", "urgent action", "login now"]):
+            extra_risk += 15
+                    
 
 # ✅ now safe
         if url_phishing_advanced and not is_safe_domain:
@@ -338,11 +379,9 @@ def analyze(data: Data):
         if is_unsafe:
             extra_risk += 40
             print("🚨 Google Safe Browsing: Threat detected!")
-        
-     
-
+      
         if is_safe_domain:
-            extra_risk = 0
+            extra_risk = min(extra_risk, 20)
             print(f"✅ Safe domain detected: {domain_only}")
         
         # ===== ML PREDICTION (NEW 🔥) =====
