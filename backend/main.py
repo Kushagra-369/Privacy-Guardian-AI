@@ -25,6 +25,15 @@ risk_model = None
 phishing_model = None
 
 try:
+    if os.path.exists("ai/phishing_model.pkl"):
+        phishing_model = joblib.load("ai/phishing_model.pkl")
+        print("✅ Phishing model loaded")
+    else:
+        print("⚠️ Phishing model not found")
+except Exception as e:
+    print("❌ Phishing Model Load Error:", e)
+
+try:
     if os.path.exists("ai/model.pkl"):
         risk_model = joblib.load("ai/model.pkl")
         print("✅ Risk model loaded")
@@ -260,8 +269,7 @@ def analyze(data: Data):
     
     try:
         # ===== ADVANCED URL ANALYSIS =====
-        url_phishing_advanced, url_risk_score = detect_url_phishing_advanced(data.url)
-        brand_spoof, brand_message = detect_brand_spoofing(data.url)
+     
         
         # ===== CALCULATE BASE RISK =====
         num_trackers = len(data.trackers)
@@ -276,39 +284,46 @@ def analyze(data: Data):
         
         # Permission risks
         if "Allowed" in data.location:
-            extra_risk += 30
+            extra_risk += 25
         elif "Requested" in data.location:
-            extra_risk += 15
+            extra_risk += 10
             
         if "Allowed" in data.camera:
-            extra_risk += 30
+            extra_risk += 25
         elif "Requested" in data.camera:
-            extra_risk += 15
+            extra_risk += 10
             
         if "Allowed" in data.microphone:
-            extra_risk += 25
+            extra_risk += 20
         elif "Requested" in data.microphone:
             extra_risk += 10
         
         # Content risks
         if data.sensitive:
-            extra_risk += 25
+            extra_risk += 20
         if data.phishing:
-            extra_risk += 35
+            extra_risk += 20
         if data.blacklisted:
-            extra_risk += 60
+            extra_risk += 40   # reduced from 60
         if data.url_phishing:
-            extra_risk += 25
+            extra_risk += 20
         
-        # URL structure risks
-        if url_phishing_advanced:
-            extra_risk += url_risk_score
+          # ===== SAFE DOMAIN CHECK (FIXED 🔥) =====
+        url_phishing_advanced, url_risk_score = detect_url_phishing_advanced(data.url)
+        brand_spoof, brand_message = detect_brand_spoofing(data.url)
+        
+        domain_only = data.url.split("/")[2] if "://" in data.url else data.url
+        is_safe_domain = any(domain_only.endswith(d) for d in SAFE_DOMAINS)
+
+# ✅ now safe
+        if url_phishing_advanced and not is_safe_domain:
+            extra_risk += min(15, url_risk_score)
         if brand_spoof:
-            extra_risk += 50
+            extra_risk += 25   # reduced
         
         # HTTPS check
         if not data.has_https:
-            extra_risk += 20
+            extra_risk += 15
         
         # Long URL
         if data.url_length > 150:
@@ -316,19 +331,37 @@ def analyze(data: Data):
         
         # Many dots (subdomains)
         if data.dots > 4:
-            extra_risk += 15
+            extra_risk += 10
         
         # ===== GOOGLE SAFE BROWSING =====
         is_unsafe = check_google_safe(data.url)
         if is_unsafe:
-            extra_risk += 50
+            extra_risk += 40
             print("🚨 Google Safe Browsing: Threat detected!")
         
-        # ===== SAFE DOMAIN CHECK =====
-        is_safe_domain = any(domain in data.url for domain in SAFE_DOMAINS)
+     
+
         if is_safe_domain:
-            extra_risk = max(0, extra_risk - 40)
-            print(f"✅ Safe domain detected: {data.url}")
+            extra_risk = 0
+            print(f"✅ Safe domain detected: {domain_only}")
+        
+        # ===== ML PREDICTION (NEW 🔥) =====
+        if phishing_model is not None:
+            features = np.array([[
+                data.url_length,
+                data.dots,
+                1 if data.has_https else 0,
+                1 if "@" in data.url else 0,
+                data.url.count('-'),
+                1 if re.search(r'\d+\.\d+\.\d+\.\d+', data.url) else 0,
+                1 if data.url_phishing else 0
+            ]])
+
+            ml_prediction = phishing_model.predict(features)[0]
+
+            if ml_prediction == 1 and not is_safe_domain:
+                extra_risk += 20
+                print("🤖 ML detected phishing!")
         
         # ===== FINAL RISK =====
         risk = base_risk + extra_risk

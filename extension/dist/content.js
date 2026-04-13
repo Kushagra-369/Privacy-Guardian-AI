@@ -50,7 +50,7 @@ const excessiveSubdomains = subdomainCount > 3;
 // Check for hyphens in domain
 const hasHyphens = url.includes('-') && url.split('-').length > 2;
 // FINAL URL PHISHING FLAG
-const urlPhishing = isIP || hasSuspiciousWord || isFakeBrand ||
+let urlPhishing = isIP || hasSuspiciousWord || isFakeBrand ||
     hasAtSymbol || isShortened || hasSuspiciousTLD ||
     excessiveSubdomains || hasHyphens;
 // ===== BRAND SIMILARITY (Levenshtein Distance) =====
@@ -286,7 +286,7 @@ function calculateRisk() {
     }
     // Reduce risk for ultra-safe domains
     if (isUltraSafe) {
-        risk = Math.max(0, risk - 60);
+        risk = Math.min(risk, 20); // 🔥 HARD CAP
     }
     // Clamp risk
     risk = Math.min(100, Math.max(0, risk));
@@ -615,21 +615,20 @@ window.addEventListener("load", async () => {
         aiRisk = result.risk;
         aiMessage = result.message;
         if (aiRisk !== null) {
-            risk = Math.min(100, (risk * 0.3) + (aiRisk * 0.7));
+            risk = Math.min(100, (risk * 0.6) + (aiRisk * 0.4));
         }
         console.log(`🎯 Final Risk: ${Math.round(risk)}%`);
         risk = Math.round(risk); // 🔥 IMPORTANT
-        if (isBlacklisted || risk >= 75) {
+        if (isBlacklisted || (risk >= 85 && urlPhishing)) {
             showBlockedScreen();
-            return;
         }
         const userContinued = await hasUserContinued();
         if (userContinued)
             return;
-        if (risk >= 40) {
+        if (risk >= 50) {
             showBigPopup(true, false);
         }
-        else {
+        else if (risk >= 20) {
             showSmallNotification();
         }
     }
