@@ -75,7 +75,7 @@ const isFakeBrand = fakeBrands.some(brand => url.includes(brand) || fullUrl.incl
 const subdomainCount = (url.match(/\./g) || []).length;
 const excessiveSubdomains = subdomainCount > 3;
 // Check for hyphens in domain
-const hasHyphens = url.includes('-') && url.split('-').length > 2;
+const hasHyphens = url.includes('-') && url.split('-').length > 4;
 // FINAL URL PHISHING FLAG
 let urlPhishing = isIP || hasSuspiciousWord || isFakeBrand ||
     hasAtSymbol || isShortened || hasSuspiciousTLD ||
@@ -129,6 +129,8 @@ realBrands.forEach(brand => {
     }
 });
 const currentDomain = window.location.hostname;
+const hostingSafe = ["vercel.app", "netlify.app", "github.io"];
+const isHostingPlatform = hostingSafe.some(domain => currentDomain.endsWith(domain));
 const isBlacklisted = blacklist.some(domain => currentDomain.includes(domain) || fullUrl.includes(domain));
 // ===== SAFE DOMAINS =====
 const SAFE_DOMAINS = [
@@ -251,7 +253,12 @@ const suspiciousWords = [
     "limited access", "confirm your account", "update payment",
     "verify now", "click here to verify", "immediate action required"
 ];
-const foundSuspicious = suspiciousWords.some(word => pageText.includes(word));
+let suspiciousCount = 0;
+suspiciousWords.forEach(word => {
+    if (pageText.includes(word))
+        suspiciousCount++;
+});
+const foundSuspicious = suspiciousCount >= 3;
 // Check for fake login forms
 const hasFakeLoginForm = pageText.includes("login") &&
     pageText.includes("password") &&
@@ -260,7 +267,10 @@ const hasFakeLoginForm = pageText.includes("login") &&
 let risk = 0;
 function calculateRisk() {
     // Base tracker risk
-    risk = Math.min(finalTrackers.length * 10, 50);
+    const realTrackers = detectedTrackers.length;
+    risk = Math.min(realTrackers * 5, 20);
+    const effectiveUrlPhishing = isHostingPlatform ? false : urlPhishing;
+    const effectiveBrandSpoof = isHostingPlatform ? false : brandSpoof;
     // Cookie risk
     if (navigator.cookieEnabled)
         risk += 10;
@@ -281,15 +291,16 @@ function calculateRisk() {
     if (hasSensitiveForm)
         risk += 30;
     if (foundSuspicious)
-        risk += 35;
+        risk += 15;
     if (hasFakeLoginForm)
         risk += 25;
     if (isBlacklisted)
         risk += 70;
     // URL risks
-    if (urlPhishing)
+    if (effectiveUrlPhishing) {
         risk += 40;
-    if (brandSpoof)
+    }
+    if (effectiveBrandSpoof)
         risk += 50;
     if (hasAtSymbol)
         risk += 30;
@@ -314,6 +325,10 @@ function calculateRisk() {
     // Reduce risk for ultra-safe domains
     if (isUltraSafe) {
         risk = Math.min(risk, 20); // 🔥 HARD CAP
+    }
+    // 🔥 FINAL ADJUSTMENT
+    if (isHostingPlatform) {
+        risk *= 0.6; // reduce overall impact smartly
     }
     // Clamp risk
     risk = Math.min(100, Math.max(0, risk));
@@ -515,7 +530,7 @@ function showBigPopup(showCancelContinue, isBlockedFlow = false) {
         
         <hr/>
         
-        <p><b>🔍 Trackers Found:</b> ${finalTrackers.length > 0 ? finalTrackers.length + " (" + finalTrackers.slice(0, 3).join(", ") + (finalTrackers.length > 3 ? "...)" : ")") : "None"}</p>
+        <p><b>🔍 Trackers Found:</b> ${finalTrackers.length > 0 ? finalTrackers.length + " (" + finalTrackers.slice(0, 3).join(", ") + (finalTrackers.length > 3 && !url.includes("vercel.app") ? "...)" : ")") : "None"}</p>
         
         <p><b>🔐 HTTPS:</b> ${window.location.protocol === "https:" ? "✅ Yes" : "❌ No"}</p>
         <p><b>🍪 Cookies:</b> ${navigator.cookieEnabled ? "Enabled" : "Disabled"}</p>
@@ -630,12 +645,12 @@ window.addEventListener("load", async () => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                trackers: finalTrackers,
+                tracker_score: detectedTrackers.length > 5 ? 1 : 0,
                 location: locationStatus,
                 camera: cameraStatus,
                 microphone: microphoneStatus,
                 sensitive: hasSensitiveForm,
-                phishing: foundSuspicious,
+                phishing: suspiciousCount >= 3,
                 blacklisted: isBlacklisted,
                 url_phishing: urlPhishing,
                 url_length: window.location.href.length,
@@ -648,10 +663,16 @@ window.addEventListener("load", async () => {
                 hidden_elements: hiddenElements,
             }),
         });
-        const result = await response.json();
-        aiRisk = result.risk;
-        aiMessage = result.message;
-        if (aiRisk !== null) {
+        if (!response.ok) {
+            console.error("❌ Backend Error:", response.status);
+            aiRisk = null; // fallback
+        }
+        else {
+            const result = await response.json();
+            aiRisk = result.risk;
+            aiMessage = result.message;
+        }
+        if (aiRisk !== null && !isNaN(aiRisk)) {
             risk = Math.min(100, (risk * 0.6) + (aiRisk * 0.4));
         }
         console.log(`🎯 Final Risk: ${Math.round(risk)}%`);
@@ -659,9 +680,8 @@ window.addEventListener("load", async () => {
         // ===== FINAL DECISION (AFTER AI) =====
         // 🔴 BLOCK (aggressive)
         if (isBlacklisted ||
-            risk >= 70 ||
-            (aiRisk !== null && aiRisk >= 75) ||
-            (risk >= 60 && aiRisk !== null && aiRisk >= 70)) {
+            (risk >= 80 && foundSuspicious) ||
+            (aiRisk !== null && aiRisk >= 85 && foundSuspicious)) {
             showBlockedScreen();
             return;
         }

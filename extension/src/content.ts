@@ -3,6 +3,7 @@ let aiRisk: number | null = null;
 let aiMessage: string = "";
 let popupShownForSession: boolean = false;
 
+
 // ===== EXTRA PAGE ANALYSIS (NEW 🔥)
 
 // Get full page text (limited for performance)
@@ -95,7 +96,7 @@ const subdomainCount: number = (url.match(/\./g) || []).length;
 const excessiveSubdomains: boolean = subdomainCount > 3;
 
 // Check for hyphens in domain
-const hasHyphens: boolean = url.includes('-') && url.split('-').length > 2;
+const hasHyphens: boolean = url.includes('-') && url.split('-').length > 4;
 
 // FINAL URL PHISHING FLAG
 let urlPhishing: boolean = isIP || hasSuspiciousWord || isFakeBrand ||
@@ -156,6 +157,12 @@ realBrands.forEach(brand => {
 });
 
 const currentDomain: string = window.location.hostname;
+
+const hostingSafe = ["vercel.app", "netlify.app", "github.io"];
+
+const isHostingPlatform = hostingSafe.some(domain =>
+    currentDomain.endsWith(domain)
+);
 const isBlacklisted: boolean = blacklist.some(domain =>
     currentDomain.includes(domain) || fullUrl.includes(domain)
 );
@@ -302,8 +309,13 @@ const suspiciousWords: string[] = [
     "verify now", "click here to verify", "immediate action required"
 ];
 
-const foundSuspicious: boolean = suspiciousWords.some(word => pageText.includes(word));
+let suspiciousCount = 0;
 
+suspiciousWords.forEach(word => {
+    if (pageText.includes(word)) suspiciousCount++;
+});
+
+const foundSuspicious = suspiciousCount >= 3;
 // Check for fake login forms
 const hasFakeLoginForm: boolean =
     pageText.includes("login") &&
@@ -315,7 +327,10 @@ let risk: number = 0;
 
 function calculateRisk(): void {
     // Base tracker risk
-    risk = Math.min(finalTrackers.length * 10, 50);
+    const realTrackers = detectedTrackers.length;
+    risk = Math.min(realTrackers * 5, 20);
+    const effectiveUrlPhishing = isHostingPlatform ? false : urlPhishing;
+    const effectiveBrandSpoof = isHostingPlatform ? false : brandSpoof;
 
     // Cookie risk
     if (navigator.cookieEnabled) risk += 10;
@@ -332,13 +347,15 @@ function calculateRisk(): void {
 
     // Content risks
     if (hasSensitiveForm) risk += 30;
-    if (foundSuspicious) risk += 35;
+    if (foundSuspicious) risk += 15;
     if (hasFakeLoginForm) risk += 25;
     if (isBlacklisted) risk += 70;
 
     // URL risks
-    if (urlPhishing) risk += 40;
-    if (brandSpoof) risk += 50;
+    if (effectiveUrlPhishing) {
+        risk += 40;
+    }
+    if (effectiveBrandSpoof) risk += 50;
     if (hasAtSymbol) risk += 30;
     if (isShortened) risk += 20;
     if (hasSuspiciousTLD) risk += 25;
@@ -361,6 +378,10 @@ function calculateRisk(): void {
     // Reduce risk for ultra-safe domains
     if (isUltraSafe) {
         risk = Math.min(risk, 20); // 🔥 HARD CAP
+    }
+    // 🔥 FINAL ADJUSTMENT
+    if (isHostingPlatform) {
+        risk *= 0.6;  // reduce overall impact smartly
     }
     // Clamp risk
     risk = Math.min(100, Math.max(0, risk));
@@ -586,7 +607,7 @@ function showBigPopup(showCancelContinue: boolean, isBlockedFlow: boolean = fals
         
         <hr/>
         
-        <p><b>🔍 Trackers Found:</b> ${finalTrackers.length > 0 ? finalTrackers.length + " (" + finalTrackers.slice(0, 3).join(", ") + (finalTrackers.length > 3 ? "...)" : ")") : "None"}</p>
+        <p><b>🔍 Trackers Found:</b> ${finalTrackers.length > 0 ? finalTrackers.length + " (" + finalTrackers.slice(0, 3).join(", ") + (finalTrackers.length > 3 && !url.includes("vercel.app") ? "...)" : ")") : "None"}</p>
         
         <p><b>🔐 HTTPS:</b> ${window.location.protocol === "https:" ? "✅ Yes" : "❌ No"}</p>
         <p><b>🍪 Cookies:</b> ${navigator.cookieEnabled ? "Enabled" : "Disabled"}</p>
@@ -711,12 +732,12 @@ window.addEventListener("load", async () => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                trackers: finalTrackers,
+                tracker_score: detectedTrackers.length > 5 ? 1 : 0,
                 location: locationStatus,
                 camera: cameraStatus,
                 microphone: microphoneStatus,
                 sensitive: hasSensitiveForm,
-                phishing: foundSuspicious,
+                phishing: suspiciousCount >= 3,
                 blacklisted: isBlacklisted,
                 url_phishing: urlPhishing,
                 url_length: window.location.href.length,
@@ -730,11 +751,16 @@ window.addEventListener("load", async () => {
             }),
         });
 
-        const result = await response.json();
-        aiRisk = result.risk;
-        aiMessage = result.message;
+        if (!response.ok) {
+            console.error("❌ Backend Error:", response.status);
+            aiRisk = null;   // fallback
+        } else {
+            const result = await response.json();
+            aiRisk = result.risk;
+            aiMessage = result.message;
+        }
 
-        if (aiRisk !== null) {
+        if (aiRisk !== null && !isNaN(aiRisk)) {
             risk = Math.min(100, (risk * 0.6) + (aiRisk * 0.4));
         }
 
@@ -747,9 +773,8 @@ window.addEventListener("load", async () => {
         // 🔴 BLOCK (aggressive)
         if (
             isBlacklisted ||
-            risk >= 70 ||
-            (aiRisk !== null && aiRisk >= 75) ||
-            (risk >= 60 && aiRisk !== null && aiRisk >= 70)
+            (risk >= 80 && foundSuspicious) ||
+            (aiRisk !== null && aiRisk >= 85 && foundSuspicious)
         ) {
             showBlockedScreen();
             return;
