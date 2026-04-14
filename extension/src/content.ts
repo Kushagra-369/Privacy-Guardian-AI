@@ -654,7 +654,13 @@ function showBlockedScreen(): void {
             <div style="background:#4a0000; padding:40px; border-radius:20px; border: 3px solid #ff4444;">
                 <h1 style="font-size: 32px;">🚨 ACCESS BLOCKED</h1>
                 <p style="font-size: 20px; margin: 20px 0;">This website is <strong>HIGHLY DANGEROUS</strong></p>
-                <p style="font-size: 16px;">Risk Score: <strong style="color: #ff4444; font-size: 24px;">${Math.round(risk)}%</strong></p>
+                <p style="font-size: 16px;">
+    ⚙️ Final Risk: <strong style="color: #ff4444; font-size: 24px;">${Math.round(risk)}%</strong>
+</p>
+
+<p style="font-size: 14px;">
+    🤖 AI Risk: <strong>${aiRisk !== null ? aiRisk + "%" : "N/A"}</strong>
+</p>
                 <p style="font-size: 14px; margin-top: 20px;">⚠️ This site has been flagged for:</p>
                 <ul style="text-align: left; margin: 10px 0;">
                     ${isBlacklisted ? '<li>🚨 Blacklisted domain</li>' : ''}
@@ -734,18 +740,30 @@ window.addEventListener("load", async () => {
 
         console.log(`🎯 Final Risk: ${Math.round(risk)}%`);
 
-        risk = Math.round(risk); // 🔥 IMPORTANT
+        risk = Math.round(risk);
 
-        if (isBlacklisted || (risk >= 85 && urlPhishing)) {
+        // ===== FINAL DECISION (AFTER AI) =====
+
+        // 🔴 BLOCK (aggressive)
+        if (
+            isBlacklisted ||
+            risk >= 70 ||
+            (aiRisk !== null && aiRisk >= 75) ||
+            (risk >= 60 && aiRisk !== null && aiRisk >= 70)
+        ) {
             showBlockedScreen();
+            return;
         }
 
-     
-
-        if (risk >= 50) {
+        // 🟡 BIG WARNING
+        if (risk >= 40) {
+            console.log("⚠️ SHOWING BIG POPUP");
             showBigPopup(true, false);
         }
+
+        // 🟢 SMALL WARNING
         else if (risk >= 20) {
+            console.log("ℹ️ SHOWING SMALL NOTIFICATION");
             showSmallNotification();
         }
 
