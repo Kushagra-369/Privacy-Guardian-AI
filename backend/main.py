@@ -45,7 +45,8 @@ except Exception as e:
 
 # ===== REQUEST MODEL =====
 class Data(BaseModel):
-    trackers: list
+    trackers: list = []
+    tracker_score: int = 0
     location: str
     camera: str
     microphone: str
@@ -291,6 +292,8 @@ def analyze(data: Data):
         # ===== EXTRA RISK CALCULATION =====
         extra_risk = 0
         
+        if iframe_count > 0 and "malware" in data.url.lower():
+            extra_risk += 40
         # Cookie risk
         if "cookies-enabled" in data.trackers:
             extra_risk += 10
